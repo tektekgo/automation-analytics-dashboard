@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { FileUpload } from "@/components/FileUpload";
-import { DataPreview } from "@/components/DataPreview";
+import { CollapsibleDataSection } from "@/components/CollapsibleDataSection";
 import { ExecutiveDashboard } from "@/components/ExecutiveDashboard";
 import { DataSlicer, FilterConfig } from "@/components/DataSlicer";
 import { ExportControls } from "@/components/ExportControls";
@@ -44,19 +43,19 @@ const Index = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
-          {/* File Upload Section */}
+          {/* Collapsible Data Section */}
           <section>
-            <FileUpload onFileLoad={handleFileLoad} />
+            <CollapsibleDataSection
+              data={data}
+              headers={headers}
+              fileName={fileName}
+              onFileLoad={handleFileLoad}
+            />
           </section>
 
-          {/* Data Preview Section */}
+          {/* Controls and Dashboard Section */}
           {data.length > 0 && (
             <>
-              <section>
-                <DataPreview data={data} headers={headers} />
-              </section>
-
-              {/* Controls and Dashboard Section */}
               <section className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <div className="lg:col-span-1 space-y-6">
                   <DataSlicer headers={headers} onFilter={handleFilter} />
