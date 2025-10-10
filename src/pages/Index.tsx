@@ -35,7 +35,7 @@ const Index = () => {
             </h1>
           </div>
           <p className="text-center text-primary-foreground/90 mt-2">
-            VyStar Infrastructure Automation and DevOps Engineering
+            Infrastructure Automation and DevOps Engineering
           </p>
         </div>
       </header>
@@ -78,7 +78,7 @@ const Index = () => {
       <footer className="bg-card border-t border-border py-6 mt-16">
         <div className="container mx-auto px-4 text-center">
           <p className="text-muted-foreground">
-            Built with React, TypeScript, and Recharts • No backend required
+            Crafted by Sujit Gangadharan • Built with React, TypeScript, and Recharts
           </p>
         </div>
       </footer>
