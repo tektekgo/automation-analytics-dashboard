@@ -59,7 +59,6 @@ export const ExportControls = ({ data, headers, fileName }: ExportControlsProps)
     const charts = [
       { id: "cost-bar-chart", name: "Cost_Savings_Chart" },
       { id: "time-bar-chart", name: "Time_Savings_Chart" },
-      { id: "trend-line-chart", name: "Savings_Trend_Chart" },
       { id: "cost-pie-chart", name: "Cost_Distribution_Chart" },
       { id: "roi-chart", name: "ROI_Analysis_Chart" },
     ];
@@ -115,13 +114,6 @@ export const ExportControls = ({ data, headers, fileName }: ExportControlsProps)
               size="sm"
             >
               Time Savings
-            </Button>
-            <Button
-              onClick={() => handleExportChartAsImage("trend-line-chart", "Trend_Analysis")}
-              variant="outline"
-              size="sm"
-            >
-              Trend Analysis
             </Button>
             <Button
               onClick={() => handleExportChartAsImage("cost-pie-chart", "Distribution")}
