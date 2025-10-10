@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { CollapsibleDataSection } from "@/components/CollapsibleDataSection";
+import { CollapsibleControlsSection } from "@/components/CollapsibleControlsSection";
 import { ExecutiveDashboard } from "@/components/ExecutiveDashboard";
-import { DataSlicer, FilterConfig } from "@/components/DataSlicer";
-import { ExportControls } from "@/components/ExportControls";
-import { ViewModeSelector, ViewMode } from "@/components/ViewModeSelector";
+import { FilterConfig } from "@/components/DataSlicer";
+import { ViewMode } from "@/components/ViewModeSelector";
 import { BarChart3 } from "lucide-react";
 
 const Index = () => {
@@ -55,23 +55,21 @@ const Index = () => {
 
           {/* Controls and Dashboard Section */}
           {data.length > 0 && (
-            <>
-              <section className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <div className="lg:col-span-1 space-y-6">
-                  <DataSlicer headers={headers} onFilter={handleFilter} />
-                  <ViewModeSelector 
-                    value={viewMode} 
-                    onChange={setViewMode}
-                    hasPeriodData={headers.some(h => h?.toLowerCase().includes('reporting') && h?.toLowerCase().includes('period'))}
-                  />
-                  <ExportControls data={data} headers={headers} fileName={fileName} viewMode={viewMode} />
-                </div>
-                
-                <div className="lg:col-span-3">
-                  <ExecutiveDashboard data={data} headers={headers} filters={filters} viewMode={viewMode} />
-                </div>
-              </section>
-            </>
+            <section className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-6">
+              <CollapsibleControlsSection
+                headers={headers}
+                data={data}
+                fileName={fileName}
+                viewMode={viewMode}
+                onFilter={handleFilter}
+                onViewModeChange={setViewMode}
+                hasPeriodData={headers.some(h => h?.toLowerCase().includes('reporting') && h?.toLowerCase().includes('period'))}
+              />
+              
+              <div>
+                <ExecutiveDashboard data={data} headers={headers} filters={filters} viewMode={viewMode} />
+              </div>
+            </section>
           )}
         </div>
       </main>
