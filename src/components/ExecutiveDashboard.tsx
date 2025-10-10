@@ -498,7 +498,7 @@ export const ExecutiveDashboard = ({ data, headers, filters, viewMode }: Executi
           <PopoverTrigger asChild>
             <Button variant="outline" className="w-[300px] justify-start">
               {selectedUseCases.length === 0 
-                ? "Select use cases to display (showing top 15)" 
+                ? `Select use cases to display (showing ${Math.min(chartData.length, allChartData.length)})` 
                 : `${selectedUseCases.length} use case${selectedUseCases.length > 1 ? 's' : ''} selected`}
             </Button>
           </PopoverTrigger>
