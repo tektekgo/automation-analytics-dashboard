@@ -118,6 +118,15 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
     };
   }, [filteredData, headers]);
 
+  // Detect team/area column for grouping
+  const teamColumnIdx = useMemo(() => {
+    return headers.findIndex(h => {
+      const lower = h?.toLowerCase() || '';
+      return lower.includes('area') || lower.includes('team') || 
+             lower.includes('department') || lower.includes('group');
+    });
+  }, [headers]);
+
   const allChartData = useMemo(() => {
     if (!metrics) return [];
     
@@ -168,21 +177,34 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
   const pieData = useMemo(() => {
     if (!metrics || !chartData.length) return [];
     
-    // Sort by cost savings and take top items that represent significant portions
+    // If we have a team/area column, group by that
+    if (teamColumnIdx >= 0) {
+      const teamSavings = new Map<string, number>();
+      
+      chartData.forEach((item) => {
+        const originalRow = filteredData[item.index];
+        const teamName = originalRow[teamColumnIdx]?.toString() || 'Unknown';
+        const currentSavings = teamSavings.get(teamName) || 0;
+        teamSavings.set(teamName, currentSavings + item.costSavings);
+      });
+      
+      // Convert map to array and sort by savings
+      return Array.from(teamSavings.entries())
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value);
+    }
+    
+    // Fallback to individual use cases if no team column
     const sorted = [...chartData].sort((a, b) => b.costSavings - a.costSavings);
     const totalSavings = sorted.reduce((sum, item) => sum + item.costSavings, 0);
-    
-    // Take items that represent at least 2% of total or top 8, whichever gives more items
     const significantItems = sorted.filter(item => (item.costSavings / totalSavings) >= 0.02).slice(0, 8);
-    
-    // If we have less than 3 items, just take top 6
     const itemsToShow = significantItems.length >= 3 ? significantItems : sorted.slice(0, 6);
     
     return itemsToShow.map((item) => ({
       name: item.name,
       value: item.costSavings
     }));
-  }, [chartData, metrics]);
+  }, [chartData, metrics, teamColumnIdx, filteredData]);
 
   if (!data.length || !headers.length || !metrics) return null;
 
@@ -438,16 +460,18 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Cost Savings Distribution" id="cost-pie-chart">
+        <ChartCard 
+          title={teamColumnIdx >= 0 ? `Cost Savings by ${headers[teamColumnIdx]}` : "Cost Savings Distribution"} 
+          id="cost-pie-chart"
+        >
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={pieData}
                 cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name.substring(0, 15)}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={90}
+                cy="45%"
+                label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                outerRadius={85}
                 fill="#8884d8"
                 dataKey="value"
               >
@@ -464,6 +488,15 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
                   boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
                 }}
                 labelStyle={{ fontWeight: 600, marginBottom: "4px" }}
+              />
+              <Legend 
+                verticalAlign="bottom" 
+                height={36}
+                formatter={(value) => value.length > 30 ? value.substring(0, 30) + '...' : value}
+                wrapperStyle={{ 
+                  paddingTop: "10px",
+                  fontSize: "11px"
+                }}
               />
             </PieChart>
           </ResponsiveContainer>
