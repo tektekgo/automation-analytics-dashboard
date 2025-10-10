@@ -409,7 +409,11 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="ROI Analysis by Use Case" id="roi-chart">
+        <ChartCard 
+          title="ROI Analysis by Use Case" 
+          description="Cost savings per hour saved (higher = more cost-effective)"
+          id="roi-chart"
+        >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart 
               data={chartData.map(item => ({
