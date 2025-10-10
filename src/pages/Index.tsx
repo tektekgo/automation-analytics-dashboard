@@ -30,11 +30,11 @@ const Index = () => {
           <div className="flex items-center justify-center gap-3">
             <BarChart3 className="w-10 h-10 text-primary-foreground" />
             <h1 className="text-4xl font-bold text-primary-foreground">
-              Excel Analytics Dashboard
+              Ansible Automation Analytics Dashboard
             </h1>
           </div>
           <p className="text-center text-primary-foreground/90 mt-2">
-            Upload, Analyze, and Export Your Data with Beautiful Visualizations
+            VyStar Infrastructure Automation and DevOps Engineering
           </p>
         </div>
       </header>

@@ -1,8 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 import { ChartCard } from "./ChartCard";
 import { KPICard } from "./KPICard";
 import { DollarSign, Clock, TrendingUp, Zap } from "lucide-react";
+import { Button } from "./ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Checkbox } from "./ui/checkbox";
+import { ScrollArea } from "./ui/scroll-area";
 
 interface ExecutiveDashboardProps {
   data: any[];
@@ -10,7 +14,15 @@ interface ExecutiveDashboardProps {
   filters: any;
 }
 
-const COLORS = ["#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#6366f1"];
+const CHART_COLORS = {
+  blue: "#336699",
+  green: "#10b981", 
+  yellow: "#f59e0b",
+  orange: "#f97316",
+  purple: "#8b5cf6"
+};
+
+const COLORS = [CHART_COLORS.blue, CHART_COLORS.green, CHART_COLORS.yellow, CHART_COLORS.orange, CHART_COLORS.purple];
 
 const formatCurrency = (value: number) => {
   if (value >= 1000000) {
@@ -33,6 +45,8 @@ const formatHours = (hours: number) => {
 };
 
 export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboardProps) => {
+  const [selectedUseCases, setSelectedUseCases] = useState<number[]>([]);
+  
   const filteredData = useMemo(() => {
     if (!filters.column || !filters.value) return data;
     
@@ -104,15 +118,17 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
     };
   }, [filteredData, headers]);
 
-  const chartData = useMemo(() => {
+  const allChartData = useMemo(() => {
     if (!metrics) return [];
     
-    return filteredData.slice(0, 15).map((row, idx) => {
+    return filteredData.map((row, idx) => {
       const timeSavings = metrics.timeSavingsIdx >= 0 ? parseFloat(row[metrics.timeSavingsIdx]) || 0 : 0;
       const costSavings = metrics.costSavingsIdx >= 0 ? parseFloat(row[metrics.costSavingsIdx]) || 0 : 0;
       
       return {
-        name: row[0]?.toString().substring(0, 20) || `Item ${idx + 1}`,
+        index: idx,
+        name: row[0]?.toString() || `Item ${idx + 1}`,
+        shortName: row[0]?.toString().substring(0, 25) || `Item ${idx + 1}`,
         "Time Savings (hrs)": timeSavings,
         "Cost Savings ($)": costSavings,
         timeSavings,
@@ -120,6 +136,29 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
       };
     });
   }, [filteredData, metrics]);
+
+  const chartData = useMemo(() => {
+    if (selectedUseCases.length === 0) {
+      return allChartData.slice(0, 15);
+    }
+    return allChartData.filter(item => selectedUseCases.includes(item.index));
+  }, [allChartData, selectedUseCases]);
+
+  const toggleUseCase = (index: number) => {
+    setSelectedUseCases(prev => 
+      prev.includes(index) 
+        ? prev.filter(i => i !== index)
+        : [...prev, index]
+    );
+  };
+
+  const selectAll = () => {
+    setSelectedUseCases(allChartData.map(item => item.index));
+  };
+
+  const clearAll = () => {
+    setSelectedUseCases([]);
+  };
 
   const pieData = useMemo(() => {
     if (!metrics || !chartData.length) return [];
@@ -135,8 +174,8 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
   return (
     <div className="w-full space-y-8">
       {/* Hero Header */}
-      <div className="text-center mb-8 p-8 bg-gradient-to-r from-primary/10 via-secondary/10 to-primary/10 rounded-2xl border border-primary/20">
-        <h2 className="text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent mb-3">
+      <div className="text-center mb-8 p-8 bg-gradient-to-r from-primary/10 via-secondary/10 to-accent/10 rounded-2xl border border-primary/30 shadow-lg">
+        <h2 className="text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent mb-3">
           Automation Impact Summary
         </h2>
         <p className="text-xl text-muted-foreground">
@@ -174,36 +213,92 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
         />
       </div>
 
+      {/* Use Case Filter */}
+      <div className="flex items-center gap-4 mb-6">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-[300px] justify-start">
+              {selectedUseCases.length === 0 
+                ? "Select use cases to display (showing top 15)" 
+                : `${selectedUseCases.length} use case${selectedUseCases.length > 1 ? 's' : ''} selected`}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[400px] p-0 bg-popover border-border" align="start">
+            <div className="p-4 border-b border-border flex justify-between items-center">
+              <span className="font-semibold text-sm">Select Use Cases</span>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={selectAll} className="h-7 text-xs">
+                  Select All
+                </Button>
+                <Button variant="ghost" size="sm" onClick={clearAll} className="h-7 text-xs">
+                  Clear
+                </Button>
+              </div>
+            </div>
+            <ScrollArea className="h-[300px]">
+              <div className="p-4 space-y-3">
+                {allChartData.map((item) => (
+                  <div key={item.index} className="flex items-start space-x-3 hover:bg-accent/10 p-2 rounded">
+                    <Checkbox
+                      id={`use-case-${item.index}`}
+                      checked={selectedUseCases.includes(item.index)}
+                      onCheckedChange={() => toggleUseCase(item.index)}
+                    />
+                    <label
+                      htmlFor={`use-case-${item.index}`}
+                      className="text-sm flex-1 cursor-pointer leading-tight"
+                    >
+                      {item.name}
+                      <span className="text-muted-foreground text-xs block mt-0.5">
+                        {formatCurrency(item.costSavings)} • {item.timeSavings.toFixed(0)}h
+                      </span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </PopoverContent>
+        </Popover>
+      </div>
+
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Cost Savings by Use Case" id="cost-bar-chart">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
+            <BarChart data={chartData} margin={{ bottom: 60, left: 10, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
               <XAxis 
-                dataKey="name" 
+                dataKey="shortName" 
                 stroke="hsl(var(--foreground))" 
-                tick={{ fontSize: 12 }}
-                angle={-45}
+                tick={{ fontSize: 10 }}
+                angle={-35}
                 textAnchor="end"
-                height={80}
+                height={90}
+                interval={0}
               />
               <YAxis 
-                stroke="hsl(var(--foreground))" 
-                tickFormatter={(value) => formatCurrency(value)}
+                stroke="hsl(var(--foreground))"
+                tick={{ fontSize: 11 }}
+                tickFormatter={(value) => {
+                  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+                  if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+                  return `$${value}`;
+                }}
               />
               <Tooltip 
                 formatter={(value: number) => formatCurrency(value)}
                 contentStyle={{ 
-                  backgroundColor: "hsl(var(--card))", 
+                  backgroundColor: "hsl(var(--popover))", 
                   border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px"
-                }} 
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                }}
+                labelStyle={{ fontWeight: 600, marginBottom: "4px" }}
               />
-              <Legend />
+              <Legend wrapperStyle={{ paddingTop: "10px" }} />
               <Bar 
                 dataKey="Cost Savings ($)" 
-                fill={COLORS[0]}
+                fill={CHART_COLORS.blue}
                 radius={[8, 8, 0, 0]}
               />
             </BarChart>
@@ -212,32 +307,39 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
 
         <ChartCard title="Time Savings by Use Case" id="time-bar-chart">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
+            <BarChart data={chartData} margin={{ bottom: 60, left: 10, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
               <XAxis 
-                dataKey="name" 
+                dataKey="shortName" 
                 stroke="hsl(var(--foreground))" 
-                tick={{ fontSize: 12 }}
-                angle={-45}
+                tick={{ fontSize: 10 }}
+                angle={-35}
                 textAnchor="end"
-                height={80}
+                height={90}
+                interval={0}
               />
               <YAxis 
-                stroke="hsl(var(--foreground))" 
-                tickFormatter={(value) => `${value}h`}
+                stroke="hsl(var(--foreground))"
+                tick={{ fontSize: 11 }}
+                tickFormatter={(value) => {
+                  if (value >= 1000) return `${(value / 1000).toFixed(1)}Kh`;
+                  return `${value}h`;
+                }}
               />
               <Tooltip 
                 formatter={(value: number) => `${value.toFixed(0)} hours`}
                 contentStyle={{ 
-                  backgroundColor: "hsl(var(--card))", 
+                  backgroundColor: "hsl(var(--popover))", 
                   border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px"
-                }} 
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                }}
+                labelStyle={{ fontWeight: 600, marginBottom: "4px" }}
               />
-              <Legend />
+              <Legend wrapperStyle={{ paddingTop: "10px" }} />
               <Bar 
                 dataKey="Time Savings (hrs)" 
-                fill={COLORS[1]}
+                fill={CHART_COLORS.green}
                 radius={[8, 8, 0, 0]}
               />
             </BarChart>
@@ -246,16 +348,25 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
 
         <ChartCard title="Savings Trend Analysis" id="trend-line-chart">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData}>
+            <LineChart data={chartData} margin={{ bottom: 50, left: 10, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
               <XAxis 
-                dataKey="name" 
+                dataKey="shortName" 
                 stroke="hsl(var(--foreground))" 
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 10 }}
+                angle={-35}
+                textAnchor="end"
+                height={80}
+                interval={0}
               />
               <YAxis 
-                stroke="hsl(var(--foreground))" 
-                tickFormatter={(value) => formatCurrency(value)}
+                stroke="hsl(var(--foreground))"
+                tick={{ fontSize: 11 }}
+                tickFormatter={(value) => {
+                  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+                  if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+                  return `$${value}`;
+                }}
               />
               <Tooltip 
                 formatter={(value: number, name: string) => {
@@ -263,25 +374,27 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
                   return formatCurrency(value);
                 }}
                 contentStyle={{ 
-                  backgroundColor: "hsl(var(--card))", 
+                  backgroundColor: "hsl(var(--popover))", 
                   border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px"
-                }} 
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                }}
+                labelStyle={{ fontWeight: 600, marginBottom: "4px" }}
               />
-              <Legend />
+              <Legend wrapperStyle={{ paddingTop: "10px" }} />
               <Line 
                 type="monotone" 
                 dataKey="Cost Savings ($)" 
-                stroke={COLORS[0]}
+                stroke={CHART_COLORS.blue}
                 strokeWidth={3}
-                dot={{ fill: COLORS[0], r: 5 }}
+                dot={{ fill: CHART_COLORS.blue, r: 5 }}
               />
               <Line 
                 type="monotone" 
                 dataKey="Time Savings (hrs)" 
-                stroke={COLORS[1]}
+                stroke={CHART_COLORS.green}
                 strokeWidth={3}
-                dot={{ fill: COLORS[1], r: 5 }}
+                dot={{ fill: CHART_COLORS.green, r: 5 }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -307,10 +420,12 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
               <Tooltip 
                 formatter={(value: number) => formatCurrency(value)}
                 contentStyle={{ 
-                  backgroundColor: "hsl(var(--card))", 
+                  backgroundColor: "hsl(var(--popover))", 
                   border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px"
-                }} 
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                }}
+                labelStyle={{ fontWeight: 600, marginBottom: "4px" }}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -318,7 +433,7 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
       </div>
 
       {/* Summary Stats */}
-      <div className="bg-gradient-to-r from-primary/5 to-secondary/5 rounded-xl p-6 border border-primary/20">
+      <div className="bg-gradient-to-r from-primary/5 via-secondary/5 to-accent/5 rounded-xl p-6 border border-primary/30 shadow-lg">
         <h3 className="text-2xl font-bold text-card-foreground mb-4">Executive Summary</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
           <div>
