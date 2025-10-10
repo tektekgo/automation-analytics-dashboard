@@ -11,16 +11,25 @@ interface KPICardProps {
 }
 
 export const KPICard = ({ title, value, subtitle, icon, trend }: KPICardProps) => {
+  const isPositiveTrend = trend === undefined || trend >= 0;
+  const showTrend = trend !== undefined;
+  
   return (
     <Card className="p-6 bg-gradient-to-br from-card to-card/50 border-2 border-primary/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
       <div className="flex items-start justify-between mb-4">
         <div className="p-3 bg-gradient-to-br from-primary to-secondary rounded-lg">
           {icon}
         </div>
-        {trend && (
-          <div className="flex items-center gap-1 text-green-500">
-            <TrendingUp className="w-4 h-4" />
-            <span className="text-sm font-semibold">+{trend}%</span>
+        {showTrend && (
+          <div className={`flex items-center gap-1 ${isPositiveTrend ? 'text-green-500' : 'text-red-500'}`}>
+            {isPositiveTrend ? (
+              <TrendingUp className="w-4 h-4" />
+            ) : (
+              <TrendingUp className="w-4 h-4 rotate-180" />
+            )}
+            <span className="text-sm font-semibold">
+              {isPositiveTrend ? '+' : ''}{trend.toFixed(1)}%
+            </span>
           </div>
         )}
       </div>

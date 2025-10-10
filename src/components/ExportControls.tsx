@@ -5,14 +5,16 @@ import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import { saveAs } from "file-saver";
 import { toast } from "sonner";
+import { ViewMode } from "./ViewModeSelector";
 
 interface ExportControlsProps {
   data: any[];
   headers: string[];
   fileName: string;
+  viewMode: ViewMode;
 }
 
-export const ExportControls = ({ data, headers, fileName }: ExportControlsProps) => {
+export const ExportControls = ({ data, headers, fileName, viewMode }: ExportControlsProps) => {
   const handleExportToExcel = async () => {
     try {
       const workbook = XLSX.utils.book_new();
@@ -56,12 +58,19 @@ export const ExportControls = ({ data, headers, fileName }: ExportControlsProps)
   };
 
   const handleExportAllCharts = async () => {
-    const charts = [
-      { id: "cost-bar-chart", name: "Cost_Savings_Chart" },
-      { id: "time-bar-chart", name: "Time_Savings_Chart" },
-      { id: "cost-pie-chart", name: "Cost_Distribution_Chart" },
-      { id: "roi-chart", name: "ROI_Analysis_Chart" },
-    ];
+    const charts = viewMode === "forecast-vs-actual" 
+      ? [
+          { id: "cost-comparison-chart", name: "Cost_Comparison_Chart" },
+          { id: "time-comparison-chart", name: "Time_Comparison_Chart" },
+          { id: "cost-pie-chart", name: "Cost_Distribution_Chart" },
+          { id: "roi-chart", name: "ROI_Analysis_Chart" },
+        ]
+      : [
+          { id: "cost-bar-chart", name: "Cost_Savings_Chart" },
+          { id: "time-bar-chart", name: "Time_Savings_Chart" },
+          { id: "cost-pie-chart", name: "Cost_Distribution_Chart" },
+          { id: "roi-chart", name: "ROI_Analysis_Chart" },
+        ];
 
     for (const chart of charts) {
       await handleExportChartAsImage(chart.id, chart.name);
@@ -101,20 +110,41 @@ export const ExportControls = ({ data, headers, fileName }: ExportControlsProps)
         <div className="pt-3 border-t border-border">
           <p className="text-sm text-muted-foreground mb-3">Export Individual Charts:</p>
           <div className="grid grid-cols-2 gap-2">
-            <Button
-              onClick={() => handleExportChartAsImage("cost-bar-chart", "Cost_Savings")}
-              variant="outline"
-              size="sm"
-            >
-              Cost Savings
-            </Button>
-            <Button
-              onClick={() => handleExportChartAsImage("time-bar-chart", "Time_Savings")}
-              variant="outline"
-              size="sm"
-            >
-              Time Savings
-            </Button>
+            {viewMode === "forecast-vs-actual" ? (
+              <>
+                <Button
+                  onClick={() => handleExportChartAsImage("cost-comparison-chart", "Cost_Comparison")}
+                  variant="outline"
+                  size="sm"
+                >
+                  Cost Comparison
+                </Button>
+                <Button
+                  onClick={() => handleExportChartAsImage("time-comparison-chart", "Time_Comparison")}
+                  variant="outline"
+                  size="sm"
+                >
+                  Time Comparison
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  onClick={() => handleExportChartAsImage("cost-bar-chart", "Cost_Savings")}
+                  variant="outline"
+                  size="sm"
+                >
+                  Cost Savings
+                </Button>
+                <Button
+                  onClick={() => handleExportChartAsImage("time-bar-chart", "Time_Savings")}
+                  variant="outline"
+                  size="sm"
+                >
+                  Time Savings
+                </Button>
+              </>
+            )}
             <Button
               onClick={() => handleExportChartAsImage("cost-pie-chart", "Distribution")}
               variant="outline"

@@ -2,16 +2,20 @@ import { useMemo, useState } from "react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 import { ChartCard } from "./ChartCard";
 import { KPICard } from "./KPICard";
-import { DollarSign, Clock, TrendingUp, Zap } from "lucide-react";
+import { DollarSign, Clock, TrendingUp, Zap, TrendingDown } from "lucide-react";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Checkbox } from "./ui/checkbox";
 import { ScrollArea } from "./ui/scroll-area";
+import { ViewMode } from "./ViewModeSelector";
+import { Alert, AlertDescription } from "./ui/alert";
+import { Info } from "lucide-react";
 
 interface ExecutiveDashboardProps {
   data: any[];
   headers: string[];
   filters: any;
+  viewMode: ViewMode;
 }
 
 const CHART_COLORS = {
@@ -44,8 +48,36 @@ const formatHours = (hours: number) => {
   return `${hours.toFixed(0)} Hours`;
 };
 
-export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboardProps) => {
+export const ExecutiveDashboard = ({ data, headers, filters, viewMode }: ExecutiveDashboardProps) => {
   const [selectedUseCases, setSelectedUseCases] = useState<number[]>([]);
+  
+  // Detect period tracking columns
+  const periodColumns = useMemo(() => {
+    const reportingPeriodIdx = headers.findIndex(h => {
+      const lower = h?.toLowerCase() || '';
+      return (lower.includes('reporting') && lower.includes('period')) || 
+             lower === 'period' || lower === 'month';
+    });
+    
+    const periodCostIdx = headers.findIndex(h => {
+      const lower = h?.toLowerCase() || '';
+      return (lower.includes('reporting') || lower.includes('period') || lower.includes('monthly')) && 
+             (lower.includes('cost') && lower.includes('saving'));
+    });
+    
+    const periodTimeIdx = headers.findIndex(h => {
+      const lower = h?.toLowerCase() || '';
+      return (lower.includes('reporting') || lower.includes('period') || lower.includes('monthly')) && 
+             (lower.includes('time') && lower.includes('saving'));
+    });
+    
+    return {
+      reportingPeriodIdx,
+      periodCostIdx,
+      periodTimeIdx,
+      hasPeriodData: reportingPeriodIdx >= 0 && periodCostIdx >= 0 && periodTimeIdx >= 0
+    };
+  }, [headers]);
   
   const filteredData = useMemo(() => {
     if (!filters.column || !filters.value) return data;
@@ -62,15 +94,30 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
   const metrics = useMemo(() => {
     if (!filteredData.length || !headers.length) return null;
 
-    // More flexible column detection
-    const timeSavingsIdx = headers.findIndex(h => {
+    // Detect forecast columns
+    const forecastTimeSavingsIdx = headers.findIndex(h => {
+      const lower = h?.toLowerCase() || '';
+      return ((lower.includes('forecast') || lower.includes('yearly')) && 
+              lower.includes('time') && lower.includes('saving')) ||
+             lower === 'forecasted yearly time savings (hrs)';
+    });
+    
+    const forecastCostSavingsIdx = headers.findIndex(h => {
+      const lower = h?.toLowerCase() || '';
+      return ((lower.includes('forecast') || lower.includes('yearly')) && 
+              lower.includes('cost') && lower.includes('saving')) ||
+             lower === 'forecasted yearly cost savings($)';
+    });
+    
+    // Fallback to any time/cost savings columns if no forecast columns found
+    const timeSavingsIdx = forecastTimeSavingsIdx >= 0 ? forecastTimeSavingsIdx : headers.findIndex(h => {
       const lower = h?.toLowerCase() || '';
       return (lower.includes('time') && lower.includes('saving')) || 
              lower.includes('timesaving') ||
              lower === 'time savings';
     });
     
-    const costSavingsIdx = headers.findIndex(h => {
+    const costSavingsIdx = forecastCostSavingsIdx >= 0 ? forecastCostSavingsIdx : headers.findIndex(h => {
       const lower = h?.toLowerCase() || '';
       return (lower.includes('cost') && lower.includes('saving')) || 
              lower.includes('costsaving') ||
@@ -79,44 +126,129 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
 
     let totalTimeSavings = 0;
     let totalCostSavings = 0;
-    let automationCount = filteredData.length;
-
-    // Sum all rows
-    filteredData.forEach((row, index) => {
-      if (timeSavingsIdx >= 0 && row[timeSavingsIdx] != null) {
-        const timeValue = typeof row[timeSavingsIdx] === 'number' 
-          ? row[timeSavingsIdx] 
-          : parseFloat(String(row[timeSavingsIdx]).replace(/[^0-9.-]/g, ''));
-        
-        if (!isNaN(timeValue)) {
-          totalTimeSavings += timeValue;
-        }
-      }
+    let totalPeriodTime = 0;
+    let totalPeriodCost = 0;
+    let automationCount = 0;
+    let periodTrends = { costTrend: 0, timeTrend: 0 };
+    
+    // For period tracking, group by use case and get latest period
+    if (viewMode !== "forecast" && periodColumns.hasPeriodData) {
+      const useCaseMap = new Map<string, any[]>();
       
-      if (costSavingsIdx >= 0 && row[costSavingsIdx] != null) {
-        const costValue = typeof row[costSavingsIdx] === 'number'
-          ? row[costSavingsIdx]
-          : parseFloat(String(row[costSavingsIdx]).replace(/[^0-9.-]/g, ''));
-        
-        if (!isNaN(costValue)) {
-          totalCostSavings += costValue;
+      // Group rows by use case name
+      filteredData.forEach((row) => {
+        const useCaseName = row[0]?.toString() || '';
+        if (!useCaseMap.has(useCaseName)) {
+          useCaseMap.set(useCaseName, []);
         }
-      }
-    });
+        useCaseMap.get(useCaseName)!.push(row);
+      });
+      
+      automationCount = useCaseMap.size;
+      
+      // For each use case, get the most recent periods
+      useCaseMap.forEach((rows) => {
+        // Sort by reporting period descending
+        const sorted = rows.sort((a, b) => {
+          const periodA = a[periodColumns.reportingPeriodIdx]?.toString() || '';
+          const periodB = b[periodColumns.reportingPeriodIdx]?.toString() || '';
+          return periodB.localeCompare(periodA);
+        });
+        
+        const latest = sorted[0];
+        const previous = sorted[1];
+        
+        // Get period actuals from latest row
+        if (periodColumns.periodTimeIdx >= 0) {
+          const timeValue = parseFloat(String(latest[periodColumns.periodTimeIdx]).replace(/[^0-9.-]/g, '')) || 0;
+          totalPeriodTime += timeValue;
+        }
+        
+        if (periodColumns.periodCostIdx >= 0) {
+          const costValue = parseFloat(String(latest[periodColumns.periodCostIdx]).replace(/[^0-9.-]/g, '')) || 0;
+          totalPeriodCost += costValue;
+        }
+        
+        // Calculate trends if we have a previous period
+        if (previous) {
+          const latestCost = parseFloat(String(latest[periodColumns.periodCostIdx]).replace(/[^0-9.-]/g, '')) || 0;
+          const prevCost = parseFloat(String(previous[periodColumns.periodCostIdx]).replace(/[^0-9.-]/g, '')) || 0;
+          
+          if (prevCost > 0) {
+            periodTrends.costTrend += ((latestCost - prevCost) / prevCost) * 100;
+          }
+          
+          const latestTime = parseFloat(String(latest[periodColumns.periodTimeIdx]).replace(/[^0-9.-]/g, '')) || 0;
+          const prevTime = parseFloat(String(previous[periodColumns.periodTimeIdx]).replace(/[^0-9.-]/g, '')) || 0;
+          
+          if (prevTime > 0) {
+            periodTrends.timeTrend += ((latestTime - prevTime) / prevTime) * 100;
+          }
+        }
+        
+        // Get forecast values from any row (they should be the same)
+        if (timeSavingsIdx >= 0) {
+          const forecastTime = parseFloat(String(latest[timeSavingsIdx]).replace(/[^0-9.-]/g, '')) || 0;
+          totalTimeSavings += forecastTime;
+        }
+        
+        if (costSavingsIdx >= 0) {
+          const forecastCost = parseFloat(String(latest[costSavingsIdx]).replace(/[^0-9.-]/g, '')) || 0;
+          totalCostSavings += forecastCost;
+        }
+      });
+      
+      // Average the trends
+      periodTrends.costTrend = automationCount > 0 ? periodTrends.costTrend / automationCount : 0;
+      periodTrends.timeTrend = automationCount > 0 ? periodTrends.timeTrend / automationCount : 0;
+      
+    } else {
+      // Standard forecast view - sum all rows
+      automationCount = filteredData.length;
+      
+      filteredData.forEach((row) => {
+        if (timeSavingsIdx >= 0 && row[timeSavingsIdx] != null) {
+          const timeValue = typeof row[timeSavingsIdx] === 'number' 
+            ? row[timeSavingsIdx] 
+            : parseFloat(String(row[timeSavingsIdx]).replace(/[^0-9.-]/g, ''));
+          
+          if (!isNaN(timeValue)) {
+            totalTimeSavings += timeValue;
+          }
+        }
+        
+        if (costSavingsIdx >= 0 && row[costSavingsIdx] != null) {
+          const costValue = typeof row[costSavingsIdx] === 'number'
+            ? row[costSavingsIdx]
+            : parseFloat(String(row[costSavingsIdx]).replace(/[^0-9.-]/g, ''));
+          
+          if (!isNaN(costValue)) {
+            totalCostSavings += costValue;
+          }
+        }
+      });
+    }
 
     const avgTimeSavings = automationCount > 0 ? totalTimeSavings / automationCount : 0;
     const avgCostSavings = automationCount > 0 ? totalCostSavings / automationCount : 0;
+    const avgPeriodTime = automationCount > 0 ? totalPeriodTime / automationCount : 0;
+    const avgPeriodCost = automationCount > 0 ? totalPeriodCost / automationCount : 0;
 
     return {
       totalTimeSavings,
       totalCostSavings,
+      totalPeriodTime,
+      totalPeriodCost,
       automationCount,
       avgTimeSavings,
       avgCostSavings,
+      avgPeriodTime,
+      avgPeriodCost,
       timeSavingsIdx,
-      costSavingsIdx
+      costSavingsIdx,
+      periodTrends
     };
-  }, [filteredData, headers]);
+  }, [filteredData, headers, viewMode, periodColumns]);
 
   // Detect team/area column for grouping
   const teamColumnIdx = useMemo(() => {
@@ -130,12 +262,62 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
   const allChartData = useMemo(() => {
     if (!metrics) return [];
     
+    const parseNum = (v: any) => {
+      if (v == null) return 0;
+      return typeof v === 'number' ? v : parseFloat(String(v).replace(/[^0-9.-]/g, '')) || 0;
+    };
+    
+    // For period tracking views, group by use case and get latest period
+    if (viewMode !== "forecast" && periodColumns.hasPeriodData) {
+      const useCaseMap = new Map<string, any[]>();
+      
+      filteredData.forEach((row) => {
+        const useCaseName = row[0]?.toString() || '';
+        if (!useCaseMap.has(useCaseName)) {
+          useCaseMap.set(useCaseName, []);
+        }
+        useCaseMap.get(useCaseName)!.push(row);
+      });
+      
+      const result: any[] = [];
+      
+      useCaseMap.forEach((rows, useCaseName) => {
+        const sorted = rows.sort((a, b) => {
+          const periodA = a[periodColumns.reportingPeriodIdx]?.toString() || '';
+          const periodB = b[periodColumns.reportingPeriodIdx]?.toString() || '';
+          return periodB.localeCompare(periodA);
+        });
+        
+        const latest = sorted[0];
+        const periodTime = periodColumns.periodTimeIdx >= 0 ? parseNum(latest[periodColumns.periodTimeIdx]) : 0;
+        const periodCost = periodColumns.periodCostIdx >= 0 ? parseNum(latest[periodColumns.periodCostIdx]) : 0;
+        const forecastTime = metrics.timeSavingsIdx >= 0 ? parseNum(latest[metrics.timeSavingsIdx]) : 0;
+        const forecastCost = metrics.costSavingsIdx >= 0 ? parseNum(latest[metrics.costSavingsIdx]) : 0;
+        
+        result.push({
+          index: result.length,
+          name: useCaseName,
+          shortName: useCaseName.substring(0, 25),
+          "Time Savings (hrs)": viewMode === "forecast-vs-actual" ? forecastTime : periodTime,
+          "Cost Savings ($)": viewMode === "forecast-vs-actual" ? forecastCost : periodCost,
+          "Actual Time (hrs)": periodTime,
+          "Actual Cost ($)": periodCost,
+          "Forecast Time (hrs)": forecastTime,
+          "Forecast Cost ($)": forecastCost,
+          timeSavings: viewMode === "forecast-vs-actual" ? forecastTime : periodTime,
+          costSavings: viewMode === "forecast-vs-actual" ? forecastCost : periodCost,
+          actualTime: periodTime,
+          actualCost: periodCost,
+          forecastTime,
+          forecastCost
+        });
+      });
+      
+      return result;
+    }
+    
+    // Forecast view - use forecast columns
     return filteredData.map((row, idx) => {
-      const parseNum = (v: any) => {
-        if (v == null) return 0;
-        return typeof v === 'number' ? v : parseFloat(String(v).replace(/[^0-9.-]/g, '')) || 0;
-      };
-
       const timeSavings = metrics.timeSavingsIdx >= 0 ? parseNum(row[metrics.timeSavingsIdx]) : 0;
       const costSavings = metrics.costSavingsIdx >= 0 ? parseNum(row[metrics.costSavingsIdx]) : 0;
       
@@ -149,7 +331,7 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
         costSavings
       };
     });
-  }, [filteredData, metrics]);
+  }, [filteredData, metrics, viewMode, periodColumns]);
 
   const chartData = useMemo(() => {
     if (selectedUseCases.length === 0) {
@@ -208,12 +390,72 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
 
   if (!data.length || !headers.length || !metrics) return null;
 
+  // Determine what values to display based on view mode
+  const displayValues = useMemo(() => {
+    if (viewMode === "forecast") {
+      return {
+        costValue: metrics.totalCostSavings,
+        timeValue: metrics.totalTimeSavings,
+        costSubtitle: "Forecasted annual savings",
+        timeSubtitle: "Forecasted productivity gain",
+        avgCostValue: metrics.avgCostSavings,
+        avgTimeValue: metrics.avgTimeSavings,
+        costTrend: undefined,
+        timeTrend: undefined
+      };
+    } else if (viewMode === "period-tracking") {
+      return {
+        costValue: metrics.totalPeriodCost,
+        timeValue: metrics.totalPeriodTime,
+        costSubtitle: "Actual period savings",
+        timeSubtitle: "Actual period productivity",
+        avgCostValue: metrics.avgPeriodCost,
+        avgTimeValue: metrics.avgPeriodTime,
+        costTrend: metrics.periodTrends.costTrend,
+        timeTrend: metrics.periodTrends.timeTrend
+      };
+    } else {
+      // forecast-vs-actual
+      const costVariance = metrics.totalCostSavings > 0 
+        ? ((metrics.totalPeriodCost - metrics.totalCostSavings) / metrics.totalCostSavings) * 100 
+        : 0;
+      const timeVariance = metrics.totalTimeSavings > 0 
+        ? ((metrics.totalPeriodTime - metrics.totalTimeSavings) / metrics.totalTimeSavings) * 100 
+        : 0;
+      
+      return {
+        costValue: metrics.totalPeriodCost,
+        timeValue: metrics.totalPeriodTime,
+        costSubtitle: `${costVariance >= 0 ? '+' : ''}${costVariance.toFixed(1)}% vs Forecast`,
+        timeSubtitle: `${timeVariance >= 0 ? '+' : ''}${timeVariance.toFixed(1)}% vs Forecast`,
+        avgCostValue: metrics.avgPeriodCost,
+        avgTimeValue: metrics.avgPeriodTime,
+        costTrend: costVariance,
+        timeTrend: timeVariance
+      };
+    }
+  }, [viewMode, metrics]);
+
   return (
     <div className="w-full space-y-8">
+      {/* Period Tracking Alert */}
+      {viewMode !== "forecast" && periodColumns.hasPeriodData && (
+        <Alert className="bg-blue-500/10 border-blue-500/50">
+          <Info className="h-4 w-4 text-blue-500" />
+          <AlertDescription className="text-sm">
+            {viewMode === "period-tracking" 
+              ? "Showing actual reporting period data with period-over-period trends"
+              : "Comparing forecasted values against actual reporting period performance"}
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {/* Hero Header */}
       <div className="text-center mb-8 p-8 bg-gradient-to-r from-primary/10 via-secondary/10 to-accent/10 rounded-2xl border border-primary/30 shadow-lg">
         <h2 className="text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent mb-3">
-          Automation Impact Summary
+          {viewMode === "forecast" && "Automation Impact Summary"}
+          {viewMode === "period-tracking" && "Period Performance Tracking"}
+          {viewMode === "forecast-vs-actual" && "Forecast vs Actual Analysis"}
         </h2>
         <p className="text-xl text-muted-foreground">
           Analyzing {metrics.automationCount} Automation Use Cases
@@ -223,18 +465,18 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard
-          title="Total Cost Savings"
-          value={formatCurrency(metrics.totalCostSavings)}
-          subtitle="Annual savings achieved"
+          title={viewMode === "forecast" ? "Total Cost Savings" : "Actual Cost Savings"}
+          value={formatCurrency(displayValues.costValue)}
+          subtitle={displayValues.costSubtitle}
           icon={<DollarSign className="w-6 h-6 text-white" />}
-          trend={100}
+          trend={displayValues.costTrend}
         />
         <KPICard
-          title="Total Time Savings"
-          value={formatHours(metrics.totalTimeSavings)}
-          subtitle="Productivity gained per year"
+          title={viewMode === "forecast" ? "Total Time Savings" : "Actual Time Savings"}
+          value={formatHours(displayValues.timeValue)}
+          subtitle={displayValues.timeSubtitle}
           icon={<Clock className="w-6 h-6 text-white" />}
-          trend={85}
+          trend={displayValues.timeTrend}
         />
         <KPICard
           title="Active Automations"
@@ -244,8 +486,8 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
         />
         <KPICard
           title="Avg. ROI per Automation"
-          value={formatCurrency(metrics.avgCostSavings)}
-          subtitle={`${formatHours(metrics.avgTimeSavings)} saved`}
+          value={formatCurrency(displayValues.avgCostValue)}
+          subtitle={`${formatHours(displayValues.avgTimeValue)} saved`}
           icon={<TrendingUp className="w-6 h-6 text-white" />}
         />
       </div>
@@ -300,7 +542,45 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="Cost Savings by Use Case" id="cost-bar-chart">
+        {viewMode === "forecast-vs-actual" ? (
+          <ChartCard title="Actual vs Forecast Cost Savings" id="cost-comparison-chart">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ bottom: 60, left: 10, right: 10, top: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                <XAxis 
+                  dataKey="shortName" 
+                  stroke="hsl(var(--foreground))" 
+                  tick={{ fontSize: 10 }}
+                  angle={-35}
+                  textAnchor="end"
+                  height={90}
+                  interval={0}
+                />
+                <YAxis 
+                  stroke="hsl(var(--foreground))"
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(value) => {
+                    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+                    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+                    return `$${value.toFixed(0)}`;
+                  }}
+                />
+                <Tooltip 
+                  formatter={(value: number) => formatCurrency(value)}
+                  contentStyle={{ 
+                    backgroundColor: "hsl(var(--popover))", 
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px"
+                  }}
+                />
+                <Legend />
+                <Bar dataKey="Forecast Cost ($)" fill="hsl(var(--chart-1))" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="Actual Cost ($)" fill="hsl(var(--chart-2))" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        ) : (
+          <ChartCard title="Cost Savings by Use Case" id="cost-bar-chart">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ bottom: 60, left: 10, right: 10, top: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
@@ -355,8 +635,46 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
+        )}
 
-        <ChartCard title="Time Savings by Use Case" id="time-bar-chart">
+        {viewMode === "forecast-vs-actual" ? (
+          <ChartCard title="Actual vs Forecast Time Savings" id="time-comparison-chart">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ bottom: 60, left: 10, right: 10, top: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                <XAxis 
+                  dataKey="shortName" 
+                  stroke="hsl(var(--foreground))" 
+                  tick={{ fontSize: 10 }}
+                  angle={-35}
+                  textAnchor="end"
+                  height={90}
+                  interval={0}
+                />
+                <YAxis 
+                  stroke="hsl(var(--foreground))"
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(value) => {
+                    if (value >= 1000) return `${(value / 1000).toFixed(1)}Kh`;
+                    return `${value}h`;
+                  }}
+                />
+                <Tooltip 
+                  formatter={(value: number) => `${value.toFixed(0)} hours`}
+                  contentStyle={{ 
+                    backgroundColor: "hsl(var(--popover))", 
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px"
+                  }}
+                />
+                <Legend />
+                <Bar dataKey="Forecast Time (hrs)" fill="hsl(var(--chart-1))" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="Actual Time (hrs)" fill="hsl(var(--chart-2))" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        ) : (
+          <ChartCard title="Time Savings by Use Case" id="time-bar-chart">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ bottom: 60, left: 10, right: 10, top: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
@@ -408,8 +726,9 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
+        )}
 
-        <ChartCard 
+        <ChartCard
           title="ROI Analysis by Use Case" 
           description="Cost savings per hour saved (higher = more cost-effective)"
           id="roi-chart"
@@ -464,8 +783,8 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard 
-          title={teamColumnIdx >= 0 ? `Cost Savings by ${headers[teamColumnIdx]}` : "Cost Savings Distribution"} 
+        <ChartCard
+          title={teamColumnIdx >= 0 ? `Cost Savings by ${headers[teamColumnIdx]}` : "Cost Savings Distribution"}
           id="cost-pie-chart"
         >
           <ResponsiveContainer width="100%" height="100%">

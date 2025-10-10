@@ -4,6 +4,7 @@ import { DataPreview } from "@/components/DataPreview";
 import { ExecutiveDashboard } from "@/components/ExecutiveDashboard";
 import { DataSlicer, FilterConfig } from "@/components/DataSlicer";
 import { ExportControls } from "@/components/ExportControls";
+import { ViewModeSelector, ViewMode } from "@/components/ViewModeSelector";
 import { BarChart3 } from "lucide-react";
 
 const Index = () => {
@@ -11,6 +12,7 @@ const Index = () => {
   const [headers, setHeaders] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string>("");
   const [filters, setFilters] = useState<FilterConfig>({ column: "", value: "" });
+  const [viewMode, setViewMode] = useState<ViewMode>("forecast");
 
   const handleFileLoad = (loadedData: any[], loadedHeaders: string[], name: string) => {
     setData(loadedData);
@@ -58,11 +60,16 @@ const Index = () => {
               <section className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <div className="lg:col-span-1 space-y-6">
                   <DataSlicer headers={headers} onFilter={handleFilter} />
-                  <ExportControls data={data} headers={headers} fileName={fileName} />
+                  <ViewModeSelector 
+                    value={viewMode} 
+                    onChange={setViewMode}
+                    hasPeriodData={headers.some(h => h?.toLowerCase().includes('reporting') && h?.toLowerCase().includes('period'))}
+                  />
+                  <ExportControls data={data} headers={headers} fileName={fileName} viewMode={viewMode} />
                 </div>
                 
                 <div className="lg:col-span-3">
-                  <ExecutiveDashboard data={data} headers={headers} filters={filters} />
+                  <ExecutiveDashboard data={data} headers={headers} filters={filters} viewMode={viewMode} />
                 </div>
               </section>
             </>
