@@ -78,7 +78,7 @@ const Index = () => {
       <footer className="bg-card border-t border-border py-6 mt-16">
         <div className="container mx-auto px-4 text-center">
           <p className="text-muted-foreground">
-            Crafted by Sujit Gangadharan • Built with React, TypeScript, and Recharts
+            Solution by Sujit Gangadharan • Built with React, TypeScript, and Recharts
           </p>
         </div>
       </footer>
