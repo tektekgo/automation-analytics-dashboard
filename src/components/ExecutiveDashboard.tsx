@@ -265,7 +265,7 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Cost Savings by Use Case" id="cost-bar-chart">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ bottom: 60, left: 10, right: 10 }}>
+            <BarChart data={chartData} margin={{ bottom: 60, left: 10, right: 10, top: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
               <XAxis 
                 dataKey="shortName" 
@@ -277,13 +277,17 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
                 interval={0}
               />
               <YAxis 
+                scale="log"
+                domain={['auto', 'auto']}
                 stroke="hsl(var(--foreground))"
                 tick={{ fontSize: 11 }}
                 tickFormatter={(value) => {
                   if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
                   if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
-                  return `$${value}`;
+                  if (value >= 100) return `$${value.toFixed(0)}`;
+                  return `$${value.toFixed(0)}`;
                 }}
+                allowDataOverflow={false}
               />
               <Tooltip 
                 formatter={(value: number) => formatCurrency(value)}
@@ -300,6 +304,16 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
                 dataKey="Cost Savings ($)" 
                 fill={CHART_COLORS.blue}
                 radius={[8, 8, 0, 0]}
+                label={{ 
+                  position: 'top', 
+                  fontSize: 10,
+                  fill: 'hsl(var(--foreground))',
+                  formatter: (value: number) => {
+                    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+                    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+                    return `$${value.toFixed(0)}`;
+                  }
+                }}
               />
             </BarChart>
           </ResponsiveContainer>
@@ -307,7 +321,7 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
 
         <ChartCard title="Time Savings by Use Case" id="time-bar-chart">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ bottom: 60, left: 10, right: 10 }}>
+            <BarChart data={chartData} margin={{ bottom: 60, left: 10, right: 10, top: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
               <XAxis 
                 dataKey="shortName" 
@@ -319,12 +333,15 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
                 interval={0}
               />
               <YAxis 
+                scale="log"
+                domain={['auto', 'auto']}
                 stroke="hsl(var(--foreground))"
                 tick={{ fontSize: 11 }}
                 tickFormatter={(value) => {
                   if (value >= 1000) return `${(value / 1000).toFixed(1)}Kh`;
                   return `${value}h`;
                 }}
+                allowDataOverflow={false}
               />
               <Tooltip 
                 formatter={(value: number) => `${value.toFixed(0)} hours`}
@@ -341,6 +358,15 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
                 dataKey="Time Savings (hrs)" 
                 fill={CHART_COLORS.green}
                 radius={[8, 8, 0, 0]}
+                label={{ 
+                  position: 'top', 
+                  fontSize: 10,
+                  fill: 'hsl(var(--foreground))',
+                  formatter: (value: number) => {
+                    if (value >= 1000) return `${(value / 1000).toFixed(1)}Kh`;
+                    return `${value.toFixed(0)}h`;
+                  }
+                }}
               />
             </BarChart>
           </ResponsiveContainer>
