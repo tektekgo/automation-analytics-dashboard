@@ -122,8 +122,13 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
     if (!metrics) return [];
     
     return filteredData.map((row, idx) => {
-      const timeSavings = metrics.timeSavingsIdx >= 0 ? parseFloat(row[metrics.timeSavingsIdx]) || 0 : 0;
-      const costSavings = metrics.costSavingsIdx >= 0 ? parseFloat(row[metrics.costSavingsIdx]) || 0 : 0;
+      const parseNum = (v: any) => {
+        if (v == null) return 0;
+        return typeof v === 'number' ? v : parseFloat(String(v).replace(/[^0-9.-]/g, '')) || 0;
+      };
+
+      const timeSavings = metrics.timeSavingsIdx >= 0 ? parseNum(row[metrics.timeSavingsIdx]) : 0;
+      const costSavings = metrics.costSavingsIdx >= 0 ? parseNum(row[metrics.costSavingsIdx]) : 0;
       
       return {
         index: idx,
@@ -138,12 +143,10 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
   }, [filteredData, metrics]);
 
   const chartData = useMemo(() => {
-    const baseData = selectedUseCases.length === 0 
-      ? allChartData.slice(0, 15)
-      : allChartData.filter(item => selectedUseCases.includes(item.index));
-    
-    // Filter out items with zero or very small values for better visualization
-    return baseData.filter(item => item.costSavings >= 1 && item.timeSavings >= 1);
+    if (selectedUseCases.length === 0) {
+      return allChartData.slice(0, 15);
+    }
+    return allChartData.filter(item => selectedUseCases.includes(item.index));
   }, [allChartData, selectedUseCases]);
 
   const toggleUseCase = (index: number) => {
@@ -289,8 +292,8 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
                 interval={0}
               />
               <YAxis 
-                scale="log"
-                domain={[1, 'auto']}
+                scale="sqrt"
+                domain={['auto', 'auto']}
                 stroke="hsl(var(--foreground))"
                 tick={{ fontSize: 11 }}
                 tickFormatter={(value) => {
@@ -315,6 +318,7 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
                 dataKey="Cost Savings ($)" 
                 fill={CHART_COLORS.blue}
                 radius={[8, 8, 0, 0]}
+                minPointSize={6}
                 label={{ 
                   position: 'top', 
                   fontSize: 10,
@@ -345,7 +349,7 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
               />
               <YAxis 
                 scale="log"
-                domain={['auto', 'auto']}
+                domain={[1, 'auto']}
                 stroke="hsl(var(--foreground))"
                 tick={{ fontSize: 11 }}
                 tickFormatter={(value) => {
@@ -388,7 +392,7 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
             <BarChart 
               data={chartData.map(item => ({
                 ...item,
-                "ROI Ratio": item.costSavings / Math.max(item.timeSavings / 1000, 0.1)
+                "ROI ($/h)": item.timeSavings > 0 ? item.costSavings / item.timeSavings : 0
               }))} 
               margin={{ bottom: 60, left: 10, right: 10, top: 20 }}
             >
@@ -405,7 +409,7 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
               <YAxis 
                 stroke="hsl(var(--foreground))"
                 tick={{ fontSize: 11 }}
-                tickFormatter={(value) => `$${value.toFixed(0)}`}
+                tickFormatter={(value) => `$${value.toFixed(0)}/h`}
               />
               <Tooltip 
                 formatter={(value: number) => `$${value.toFixed(2)} per hour`}
@@ -419,14 +423,15 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
               />
               <Legend wrapperStyle={{ paddingTop: "10px" }} />
               <Bar 
-                dataKey="ROI Ratio" 
+                dataKey="ROI ($/h)" 
                 fill={CHART_COLORS.purple}
                 radius={[8, 8, 0, 0]}
+                minPointSize={6}
                 label={{ 
                   position: 'top', 
                   fontSize: 10,
                   fill: 'hsl(var(--foreground))',
-                  formatter: (value: number) => `$${value.toFixed(0)}`
+                  formatter: (value: number) => `$${value.toFixed(0)}/h`
                 }}
               />
             </BarChart>
