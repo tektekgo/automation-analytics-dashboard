@@ -138,10 +138,12 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
   }, [filteredData, metrics]);
 
   const chartData = useMemo(() => {
-    if (selectedUseCases.length === 0) {
-      return allChartData.slice(0, 15);
-    }
-    return allChartData.filter(item => selectedUseCases.includes(item.index));
+    const baseData = selectedUseCases.length === 0 
+      ? allChartData.slice(0, 15)
+      : allChartData.filter(item => selectedUseCases.includes(item.index));
+    
+    // Filter out items with zero or very small values for better visualization
+    return baseData.filter(item => item.costSavings >= 1 && item.timeSavings >= 1);
   }, [allChartData, selectedUseCases]);
 
   const toggleUseCase = (index: number) => {
@@ -163,7 +165,17 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
   const pieData = useMemo(() => {
     if (!metrics || !chartData.length) return [];
     
-    return chartData.slice(0, 8).map((item) => ({
+    // Sort by cost savings and take top items that represent significant portions
+    const sorted = [...chartData].sort((a, b) => b.costSavings - a.costSavings);
+    const totalSavings = sorted.reduce((sum, item) => sum + item.costSavings, 0);
+    
+    // Take items that represent at least 2% of total or top 8, whichever gives more items
+    const significantItems = sorted.filter(item => (item.costSavings / totalSavings) >= 0.02).slice(0, 8);
+    
+    // If we have less than 3 items, just take top 6
+    const itemsToShow = significantItems.length >= 3 ? significantItems : sorted.slice(0, 6);
+    
+    return itemsToShow.map((item) => ({
       name: item.name,
       value: item.costSavings
     }));
@@ -278,13 +290,12 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
               />
               <YAxis 
                 scale="log"
-                domain={['auto', 'auto']}
+                domain={[1, 'auto']}
                 stroke="hsl(var(--foreground))"
                 tick={{ fontSize: 11 }}
                 tickFormatter={(value) => {
                   if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
                   if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
-                  if (value >= 100) return `$${value.toFixed(0)}`;
                   return `$${value.toFixed(0)}`;
                 }}
                 allowDataOverflow={false}
@@ -372,9 +383,15 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Savings Trend Analysis" id="trend-line-chart">
+        <ChartCard title="ROI Analysis by Use Case" id="roi-chart">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ bottom: 50, left: 10, right: 10 }}>
+            <BarChart 
+              data={chartData.map(item => ({
+                ...item,
+                "ROI Ratio": item.costSavings / Math.max(item.timeSavings / 1000, 0.1)
+              }))} 
+              margin={{ bottom: 60, left: 10, right: 10, top: 20 }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
               <XAxis 
                 dataKey="shortName" 
@@ -382,23 +399,16 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
                 tick={{ fontSize: 10 }}
                 angle={-35}
                 textAnchor="end"
-                height={80}
+                height={90}
                 interval={0}
               />
               <YAxis 
                 stroke="hsl(var(--foreground))"
                 tick={{ fontSize: 11 }}
-                tickFormatter={(value) => {
-                  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-                  if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
-                  return `$${value}`;
-                }}
+                tickFormatter={(value) => `$${value.toFixed(0)}`}
               />
               <Tooltip 
-                formatter={(value: number, name: string) => {
-                  if (name.includes('Time')) return `${value.toFixed(0)} hours`;
-                  return formatCurrency(value);
-                }}
+                formatter={(value: number) => `$${value.toFixed(2)} per hour`}
                 contentStyle={{ 
                   backgroundColor: "hsl(var(--popover))", 
                   border: "1px solid hsl(var(--border))",
@@ -408,21 +418,18 @@ export const ExecutiveDashboard = ({ data, headers, filters }: ExecutiveDashboar
                 labelStyle={{ fontWeight: 600, marginBottom: "4px" }}
               />
               <Legend wrapperStyle={{ paddingTop: "10px" }} />
-              <Line 
-                type="monotone" 
-                dataKey="Cost Savings ($)" 
-                stroke={CHART_COLORS.blue}
-                strokeWidth={3}
-                dot={{ fill: CHART_COLORS.blue, r: 5 }}
+              <Bar 
+                dataKey="ROI Ratio" 
+                fill={CHART_COLORS.purple}
+                radius={[8, 8, 0, 0]}
+                label={{ 
+                  position: 'top', 
+                  fontSize: 10,
+                  fill: 'hsl(var(--foreground))',
+                  formatter: (value: number) => `$${value.toFixed(0)}`
+                }}
               />
-              <Line 
-                type="monotone" 
-                dataKey="Time Savings (hrs)" 
-                stroke={CHART_COLORS.green}
-                strokeWidth={3}
-                dot={{ fill: CHART_COLORS.green, r: 5 }}
-              />
-            </LineChart>
+            </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
