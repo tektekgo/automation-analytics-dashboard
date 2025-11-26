@@ -1,8 +1,50 @@
-# Welcome to your Lovable project
+# Automation Analytics Dashboard
 
-## Project info
+## Overview
+The **Automation Analytics Dashboard** is a React-based web application designed to visualize and analyze automation metrics. It allows users to upload data (likely from Excel/CSV), view high-level KPIs, and explore detailed breakdowns of cost and time savings.
 
-**URL**: https://lovable.dev/projects/3a5d3327-375f-4d61-8616-70410e2f8955
+## Key Features
+
+### 1. Data Ingestion
+- **File Upload**: Users can upload data files (Excel/CSV) to populate the dashboard.
+- **Data Parsing**: The application parses headers and rows to structure the data for analysis.
+
+### 2. Executive Dashboard
+The core component (`ExecutiveDashboard.tsx`) provides a comprehensive view of automation performance:
+- **KPI Cards**: Displays key metrics:
+  - **Total Cost Savings**: Financial impact of automations.
+  - **Total Time Savings**: Productivity gains in hours/years.
+  - **Active Automations**: Count of deployed use cases.
+  - **ROI Analysis**: Average return on investment per automation.
+- **View Modes**:
+  - **Forecast**: Projected annual savings.
+  - **Period Tracking**: Actual realized savings based on reporting periods.
+  - **Forecast vs Actual**: Comparison view to track performance against goals.
+
+### 3. Visualizations
+- **Bar Charts**:
+  - Cost Savings by Use Case.
+  - Time Savings by Use Case.
+  - ROI Analysis (Cost savings per hour saved).
+  - Comparison charts for Forecast vs Actuals.
+- **Pie Chart**: Cost Savings Distribution (grouped by Team/Area if available).
+- **Interactive Elements**: Tooltips, legends, and responsive containers.
+
+### 4. Data Analysis & Filtering
+- **Data Slicer**: Allows users to filter the dataset by:
+  - Specific columns and values.
+  - Date ranges (optional).
+- **Drill-down**: Users can select specific use cases to filter the charts.
+- **Period Trends**: Calculates period-over-period trends for cost and time savings.
+
+### 5. Export Capabilities
+- **Excel Export**: Download the current dataset as an Excel file.
+- **Image Export**: Save individual charts or the entire dashboard view as PNG images for reporting.
+
+### 6. Responsive UI
+- **Collapsible Sections**: Data and Control sections can be collapsed to maximize screen real estate for the dashboard.
+- **Theme**: Uses a modern, clean design with gradient headers and card-based layouts.
+
 
 ## How can I edit this code?
 
@@ -50,15 +92,14 @@ npm run dev
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Tech Stack
+- **Framework**: React (Vite)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS, shadcn-ui
+- **Charts**: Recharts
+- **State Management**: React Query (TanStack Query)
+- **Routing**: React Router DOM
+- **Utilities**: `xlsx` (Excel processing), `html2canvas` (Image export), `zod` (Validation)
 
 ## How can I deploy this project?
 
